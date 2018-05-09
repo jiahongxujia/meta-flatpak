@@ -1,9 +1,9 @@
 # Netboot initramfs image.
 DESCRIPTION = "OSTree initramfs image"
 
-PACKAGE_INSTALL = "ostree-switchroot ostree-initrd busybox base-passwd ${ROOTFS_BOOTSTRAP_INSTALL}"
+PACKAGE_INSTALL = "ostree-switchroot initramfs-ostree bash kmod bzip2 sed tar kbd coreutils util-linux grep gawk udev mdadm base-passwd ${ROOTFS_BOOTSTRAP_INSTALL} ${CUBE_BUILDER_INITRAMFS_EXTRA_INSTALL} rng-tools findutils gzip e2fsprogs-tune2fs e2fsprogs-resize2fs pv"
 
-SYSTEMD_DEFAULT_TARGET = "initrd.target"
+PACKAGE_EXCLUDE = "busybox busybox-dev busybox-udhcpc busybox-dbg busybox-ptest busybox-udhcpd busybox-hwclock busybox-syslog"
 
 # Do not pollute the initrd image with rootfs features
 IMAGE_FEATURES = ""
