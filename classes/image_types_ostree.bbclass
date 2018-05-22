@@ -6,6 +6,9 @@ do_image_ostree[depends] = "ostree-native:do_populate_sysroot \
                         virtual/kernel:do_deploy \
                         ${OSTREE_INITRAMFS_IMAGE}:do_image_complete"
 
+export REPRODUCIBLE_TIMESTAMP_ROOTFS = "${WRLINUX_MAJOR_VERSION]${WRLINUX_YEAR_VERSION}"
+export BUILD_REPRODUCIBLE_BINARIES = "1"
+
 export OSTREE_REPO
 export OSTREE_BRANCHNAME
 OSTREE_KERNEL ??= "${KERNEL_IMAGETYPE}"
@@ -31,7 +34,6 @@ repo_apache_config () {
      echo "    Require all granted"
      echo "</Directory>") > ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.rootfs.ostree.http.conf
 }
-
 
 IMAGE_CMD_ostree () {
 	if [ -z "$OSTREE_REPO" ]; then
