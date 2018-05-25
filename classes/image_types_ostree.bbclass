@@ -35,6 +35,29 @@ repo_apache_config () {
      echo "</Directory>") > ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.rootfs.ostree.http.conf
 }
 
+
+create_tarball_and_ostreecommit[vardepsexclude] = "DATETIME"
+create_tarball_and_ostreecommit() {
+	local _image_basename=$1
+
+	# Create a tarball that can be then commited to OSTree repo
+	OSTREE_TAR=${DEPLOY_DIR_IMAGE}/${_image_basename}-${MACHINE}-${DATETIME}.rootfs.ostree.tar.bz2
+	tar -C ${OSTREE_ROOTFS} --xattrs --xattrs-include='*' -cjf ${OSTREE_TAR} .
+	sync
+
+	ln -snf ${_image_basename}-${MACHINE}-${DATETIME}.rootfs.ostree.tar.bz2 \
+	    ${DEPLOY_DIR_IMAGE}/${_image_basename}-${MACHINE}.rootfs.ostree.tar.bz2
+
+	# Commit the result
+	ostree --repo=${OSTREE_REPO} commit \
+	       --tree=dir=${OSTREE_ROOTFS} \
+	       --skip-if-unchanged \
+	       --gpg-sign=${FLATPAK_GPGID} \
+	       --gpg-homedir=${FLATPAK_GPGDIR} \
+	       --branch=${_image_basename} \
+	       --subject="Commit-id: ${_image_basename}-${MACHINE}-${DATETIME}"
+}
+
 IMAGE_CMD_ostree () {
 	if [ -z "$OSTREE_REPO" ]; then
 		bbfatal "OSTREE_REPO should be set in your local.conf"
@@ -86,10 +109,6 @@ IMAGE_CMD_ostree () {
 
 		ln -s ../init.d/tmpfiles.sh usr/etc/rcS.d/S20tmpfiles.sh
 	fi
-
-	# Preserve OSTREE_BRANCHNAME for future information
-	mkdir -p usr/share/sota/
-	echo -n "${OSTREE_BRANCHNAME}" > usr/share/sota/branchname
 
 	# Preserve data in /home to be later copied to /sysroot/home by
 	#   sysroot generating procedure
@@ -232,26 +251,21 @@ IMAGE_CMD_ostree () {
 
 	cd ${WORKDIR}
 
-	# Create a tarball that can be then commited to OSTree repo
-	OSTREE_TAR=${DEPLOY_DIR_IMAGE}/${IMAGE_NAME}.rootfs.ostree.tar.bz2 
-	tar -C ${OSTREE_ROOTFS} --xattrs --xattrs-include='*' -cjf ${OSTREE_TAR} .
-	sync
-
-	rm -f ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.rootfs.ostree.tar.bz2
-	ln -s ${IMAGE_NAME}.rootfs.ostree.tar.bz2 ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.rootfs.ostree.tar.bz2
-	
 	if [ ! -d ${OSTREE_REPO} ]; then
 		ostree --repo=${OSTREE_REPO} init --mode=archive-z2
 	fi
 
-	# Commit the result
-	ostree --repo=${OSTREE_REPO} commit \
-	       --tree=dir=${OSTREE_ROOTFS} \
-	       --skip-if-unchanged \
-	       --gpg-sign=${FLATPAK_GPGID} \
-	       --gpg-homedir=${FLATPAK_GPGDIR} \
-	       --branch=${OSTREE_BRANCHNAME} \
-	       --subject="Commit-id: ${IMAGE_NAME}"
+	# Preserve OSTREE_BRANCHNAME for future information
+	mkdir -p ${OSTREE_ROOTFS}/usr/share/sota/
+	echo -n "${OSTREE_BRANCHNAME}-dev" > ${OSTREE_ROOTFS}/usr/share/sota/branchname
+	create_tarball_and_ostreecommit "${OSTREE_BRANCHNAME}-dev"
+
+	# Clean up package management data for factory deploy
+	rm -rf ${OSTREE_ROOTFS}/usr/rootdirs/var/lib/rpm/*
+	rm -rf ${OSTREE_ROOTFS}/usr/rootdirs/var/lib/dnf/*
+
+	echo -n "${OSTREE_BRANCHNAME}" > ${OSTREE_ROOTFS}/usr/share/sota/branchname
+	create_tarball_and_ostreecommit "${OSTREE_BRANCHNAME}"
 
 	ostree summary -u --repo=${OSTREE_REPO} 
 	repo_apache_config
@@ -268,5 +282,11 @@ IMAGE_CMD_ostreepush () {
 			    --ref=${OSTREE_BRANCHNAME} \
 			    --credentials=${OSTREE_PUSH_CREDENTIALS} \
 			    --cacert=${STAGING_ETCDIR_NATIVE}/ssl/certs/ca-certificates.crt
+
+		garage-push --repo=${OSTREE_REPO} \
+			    --ref=${OSTREE_BRANCHNAME}-dev \
+			    --credentials=${OSTREE_PUSH_CREDENTIALS} \
+			    --cacert=${STAGING_ETCDIR_NATIVE}/ssl/certs/ca-certificates.crt
+
 	fi
 }
