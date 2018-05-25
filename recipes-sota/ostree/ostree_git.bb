@@ -15,6 +15,7 @@ SRC_URI = "gitsm://github.com/ostreedev/ostree.git;branch=master \
            file://0001-ostree-secure-boot-support-for-no-change-to-grub.cfg.patch \
            file://0001-Allow-updating-files-in-the-boot-directory.patch  \
            file://0002-u-boot-add-bootdir-to-the-generated-uEnv.txt.patch \
+           file://0003-uboot-add-non-default-for-bootdirs-to-uEnv.txt.patch \
            file://ostree_swap_bootentry_atomically.patch \
 	   file://using-bash-specifically.patch \
 	   file://0001-create-boot-symlink-based-on-relative-path.patch \
