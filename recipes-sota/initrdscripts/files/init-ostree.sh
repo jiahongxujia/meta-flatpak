@@ -10,6 +10,8 @@ OSTREE_SYSROOT=""
 #OSTREE_LABEL_ROOT="otaroot"
 OSTREE_LABEL_BOOT="otaboot"
 OSTREE_LABEL_FLUXDATA="fluxdata"
+# The timeout (tenth of a second) for rootfs on low speed device
+MAX_TIMEOUT_FOR_WAITING_LOWSPEED_DEVICE=60
 
 # Copied from initramfs-framework. The core of this script probably should be
 # turned into initramfs-framework modules to reduce duplication.
@@ -118,11 +120,14 @@ mkdir -p $ROOT_MOUNT/
 sleep ${ROOT_DELAY}
 
 [ -z $OSTREE_ROOT_DEVICE ] && fatal "No OSTREE root device specified, please add 'ostree_root=LABEL=xyz' in bootline!" || {
-    echo "Checking if $OSTREE_ROOT_DEVICE is available..."
-    ostree_label=$(echo $OSTREE_ROOT_DEVICE | cut -f 2 -d'=')
-    while [ 1 ] ; do
-        blkid -t LABEL=$ostree_label && break
-        blkid -t LABEL=luks_$ostree_label && break
+    echo "Waiting for low speed devices to be available ..."
+    ostree_root_label=$(echo $OSTREE_ROOT_DEVICE | cut -f 2 -d'=')
+    retry=0
+    # For LUKS, we might wait for MAX_TIMEOUT_FOR_WAITING_LOWSPEED_DEVICE/10s
+    while [ $retry -lt $MAX_TIMEOUT_FOR_WAITING_LOWSPEED_DEVICE ] ; do
+	retry=$(($retry+1))
+        blkid -t LABEL=$ostree_root_label && break
+        blkid -t LABEL=luks_$ostree_root_label && break
 	#echo "sleep to wait for $OSTREE_ROOT_DEVICE"
         sleep 0.1
     done
