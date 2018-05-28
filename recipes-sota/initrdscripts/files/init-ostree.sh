@@ -7,7 +7,7 @@ MOUNT="/bin/mount"
 UMOUNT="/bin/umount"
 ROOT_DELAY="0"
 OSTREE_SYSROOT=""
-OSTREE_LABEL_ROOT="otaroot"
+#OSTREE_LABEL_ROOT="otaroot"
 OSTREE_LABEL_BOOT="otaboot"
 OSTREE_LABEL_FLUXDATA="fluxdata"
 
@@ -117,6 +117,16 @@ mkdir -p $ROOT_MOUNT/
 
 sleep ${ROOT_DELAY}
 
+[ -z $OSTREE_ROOT_DEVICE ] && fatal "No OSTREE root device specified, please add 'ostree_root=LABEL=xyz' in bootline!" || {
+    echo "Checking if $OSTREE_ROOT_DEVICE is available..."
+    ostree_label=$(echo $OSTREE_ROOT_DEVICE | cut -f 2 -d'=')
+    while [ 1 ] ; do
+        blkid -t LABEL=$ostree_label && break
+        blkid -t LABEL=luks_$ostree_label && break
+	#echo "sleep to wait for $OSTREE_ROOT_DEVICE"
+        sleep 0.1
+    done
+}
 try_to_mount_rootfs() {
     local mount_flags="rw,noatime,iversion"
     mount_flags="${mount_flags},${ROOT_FLAGS}"
@@ -124,11 +134,9 @@ try_to_mount_rootfs() {
     mount -o $mount_flags "${OSTREE_ROOT_DEVICE}" "${ROOT_MOUNT}" 2>/dev/null && return 0
 }
 
-ROOT_MOUNT_TEST="/sysroot_test"
-
 [ -x /init.luks ] && {
     expand_fluxdata luks_$OSTREE_LABEL_FLUXDATA
-    /init.luks $ROOT_MOUNT_TEST && {
+    /init.luks /sysroot_luks && {
         echo "LUKS init done."
     } || fatal "Couldn't init LUKS, dropping to shell"
 } || expand_fluxdata $OSTREE_LABEL_FLUXDATA
