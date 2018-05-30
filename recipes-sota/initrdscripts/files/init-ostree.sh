@@ -158,14 +158,14 @@ while [ 1 ] ; do
     sleep 0.1
 done
 
+ostree-prepare-root ${ROOT_MOUNT}
+
 # Move the mount points of some filesystems over to
 # the corresponding directories under the real root filesystem.
 for dir in `cat /proc/mounts | grep -v rootfs | awk '{print $2}'` ; do
     mkdir -p  ${ROOT_MOUNT}/${dir##*/}
     mount -nv --move $dir ${ROOT_MOUNT}/${dir##*/}
 done
-
-ostree-prepare-root ${ROOT_MOUNT}
 
 cd $ROOT_MOUNT
 
