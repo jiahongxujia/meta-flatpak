@@ -1,5 +1,28 @@
 #!/bin/sh
 
+#/*
+#*init.sh , a script to init the ostree system in initramfs
+#* 
+#* Copyright (c) 2018 Wind River Systems, Inc.
+#* 
+#* This program is free software; you can redistribute it and/or modify
+#* it under the terms of the GNU General Public License version 2 as
+#* published by the Free Software Foundation.
+#* 
+#* This program is distributed in the hope that it will be useful,
+#* but WITHOUT ANY WARRANTY; without even the implied warranty of
+#* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#* See the GNU General Public License for more details.
+#* 
+#* You should have received a copy of the GNU General Public License
+#* along with this program; if not, write to the Free Software
+#* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+#* 
+#*/ 
+
+log_info() { echo "$0[$$]: $*" >&2; }
+log_error() { echo "$0[$$]: ERROR $*" >&2; }
+
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/lib/ostree:/usr/lib64/ostree
 
 ROOT_MOUNT="/sysroot"
@@ -7,8 +30,7 @@ MOUNT="/bin/mount"
 UMOUNT="/bin/umount"
 ROOT_DELAY="0"
 OSTREE_SYSROOT=""
-#OSTREE_LABEL_ROOT="otaroot"
-OSTREE_LABEL_BOOT="otaboot"
+#OSTREE_LABEL_BOOT="otaboot"
 OSTREE_LABEL_FLUXDATA="fluxdata"
 # The timeout (tenth of a second) for rootfs on low speed device
 MAX_TIMEOUT_FOR_WAITING_LOWSPEED_DEVICE=60
@@ -43,8 +65,6 @@ early_setup() {
     do_mount_fs proc /proc
     do_mount_fs sysfs /sys
     mount -t devtmpfs none /dev
-    do_mount_fs devpts /dev/pts
-    do_mount_fs tmpfs /dev/shm
     do_mount_fs tmpfs /tmp
     do_mount_fs tmpfs /run
 
@@ -77,22 +97,25 @@ read_args() {
 
 expand_fluxdata() {
 
-   fluxdata_label=$1
+   fluxdata_label=$OSTREE_LABEL_FLUXDATA
    [ -z $fluxdata_label ] && echo "No fluxdata partition found." && return 0
 
    # expanding FLUXDATA
    datapart=$(blkid -s LABEL | grep "LABEL=\"$fluxdata_label\"" |head -n 1| awk -F: '{print $1}')
 
    # no fluxdata or fluxdata is a LUKS(expanding done at LUKS creation)
-   [ -z ${datapart} ] && return 0
+   [ -z ${datapart} ] && {
+	datapart=$(blkid -s LABEL | grep "LABEL=\"luks_$fluxdata_label\"" |head -n 1| awk -F: '{print $1}')
+	[ -z ${datapart} ] && return 0
+   }
 
    datadev=$(lsblk $datapart -n -o PKNAME | head -n 1)
    datadevnum=$(echo ${datapart} | sed 's/\(.*\)\(.\)$/\2/')
 
-   echo "Expanding partition for ${fluxdata_label} datadev: ${datadev}, datadevnum: ${datadevnum}"
+   echo "Expanding partition for ${fluxdata_label} ..."
    parted -s /dev/$datadev -- resizepart $datadevnum -1
 			     
-   echo "Expanding FS for ${fluxdata_label}"
+   echo "Expanding FS for ${fluxdata_label} ..."
    resize2fs -f ${datapart}
 }
 
@@ -120,7 +143,7 @@ mkdir -p $ROOT_MOUNT/
 sleep ${ROOT_DELAY}
 
 [ -z $OSTREE_ROOT_DEVICE ] && fatal "No OSTREE root device specified, please add 'ostree_root=LABEL=xyz' in bootline!" || {
-    echo "Waiting for low speed devices to be available ..."
+    echo "Waiting for low speed devices to be ready ..."
     ostree_root_label=$(echo $OSTREE_ROOT_DEVICE | cut -f 2 -d'=')
     retry=0
     # For LUKS, we might wait for MAX_TIMEOUT_FOR_WAITING_LOWSPEED_DEVICE/10s
@@ -139,12 +162,11 @@ try_to_mount_rootfs() {
     mount -o $mount_flags "${OSTREE_ROOT_DEVICE}" "${ROOT_MOUNT}" 2>/dev/null && return 0
 }
 
+expand_fluxdata
+
 [ -x /init.luks ] && {
-    expand_fluxdata luks_$OSTREE_LABEL_FLUXDATA
-    /init.luks /sysroot_luks && {
-        echo "LUKS init done."
-    } || fatal "Couldn't init LUKS, dropping to shell"
-} || expand_fluxdata $OSTREE_LABEL_FLUXDATA
+    /init.luks && echo "LUKS init done." || fatal "Couldn't init LUKS, dropping to shell"
+}
 
 echo "Waiting for root device to be ready..."
 while [ 1 ] ; do
@@ -160,14 +182,11 @@ done
 
 ostree-prepare-root ${ROOT_MOUNT}
 
-# Move the mount points of some filesystems over to
-# the corresponding directories under the real root filesystem.
-for dir in `cat /proc/mounts | grep -v rootfs | awk '{print $2}'` ; do
-    mkdir -p  ${ROOT_MOUNT}/${dir##*/}
-    mount -nv --move $dir ${ROOT_MOUNT}/${dir##*/}
-done
-
 cd $ROOT_MOUNT
+for x in dev proc sys; do
+    log_info "Moving /$x to new rootfs"
+    mount --move "/$x" "$x"
+done
 
 # If we pass args to bash, it will assume they are text files
 # to source and run.
