@@ -39,6 +39,10 @@ repo_apache_config () {
 create_tarball_and_ostreecommit[vardepsexclude] = "DATETIME"
 create_tarball_and_ostreecommit() {
 	local _image_basename=$1
+	local _timestamp=$2
+
+	# The timestamp format of ostree requires
+	_timestamp=`LC_ALL=C date --date=@$_timestamp`
 
 	# Create a tarball that can be then commited to OSTree repo
 	OSTREE_TAR=${DEPLOY_DIR_IMAGE}/${_image_basename}-${MACHINE}-${DATETIME}.rootfs.ostree.tar.bz2
@@ -55,6 +59,7 @@ create_tarball_and_ostreecommit() {
 	       --gpg-sign=${FLATPAK_GPGID} \
 	       --gpg-homedir=${FLATPAK_GPGDIR} \
 	       --branch=${_image_basename} \
+	       --timestamp=${_timestamp} \
 	       --subject="Commit-id: ${_image_basename}-${MACHINE}-${DATETIME}"
 }
 
@@ -258,14 +263,17 @@ IMAGE_CMD_ostree () {
 	# Preserve OSTREE_BRANCHNAME for future information
 	mkdir -p ${OSTREE_ROOTFS}/usr/share/sota/
 	echo -n "${OSTREE_BRANCHNAME}-dev" > ${OSTREE_ROOTFS}/usr/share/sota/branchname
-	create_tarball_and_ostreecommit "${OSTREE_BRANCHNAME}-dev"
+	timestamp=`date +%s`
+	create_tarball_and_ostreecommit "${OSTREE_BRANCHNAME}-dev" "$timestamp"
 
 	# Clean up package management data for factory deploy
 	rm -rf ${OSTREE_ROOTFS}/usr/rootdirs/var/lib/rpm/*
 	rm -rf ${OSTREE_ROOTFS}/usr/rootdirs/var/lib/dnf/*
 
+	# Make factory older than development which is helpful for ostree admin upgrade
+	timestamp=`expr $timestamp - 1`
 	echo -n "${OSTREE_BRANCHNAME}" > ${OSTREE_ROOTFS}/usr/share/sota/branchname
-	create_tarball_and_ostreecommit "${OSTREE_BRANCHNAME}"
+	create_tarball_and_ostreecommit "${OSTREE_BRANCHNAME}" "$timestamp"
 
 	ostree summary -u --repo=${OSTREE_REPO} 
 	repo_apache_config
