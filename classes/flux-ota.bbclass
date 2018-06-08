@@ -4,5 +4,5 @@ IMAGE_FSTYPES += "ostreepush otaimg wic"
 
 IMAGE_TYPEDEP_wic += "otaimg"
 
-WKS_FILE = "${IMAGE_BASENAME}-${MACHINE}.wks"
+WKS_FILE = "${@bb.utils.contains('DISTRO_FEATURES', 'luks', '${IMAGE_BASENAME}-${MACHINE}-luks.wks', '${IMAGE_BASENAME}-${MACHINE}.wks', d)}"
 WKS_FILE_DEPENDS = "mtools-native dosfstools-native e2fsprogs-native parted-native"
