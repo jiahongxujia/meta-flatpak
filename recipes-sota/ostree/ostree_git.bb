@@ -20,6 +20,7 @@ SRC_URI = "gitsm://github.com/ostreedev/ostree.git;branch=master \
 	   file://using-bash-specifically.patch \
 	   file://0001-create-boot-symlink-based-on-relative-path.patch \
 	   file://0001-retrieve-correct-boot-prefix-at-runtime.patch \
+	   file://0001-encrypt-decrypt-password-of-remote-repository-uri.patch \
 	"
 
 
@@ -41,7 +42,7 @@ DEPENDS += "attr libarchive glib-2.0 pkgconfig gpgme libgsystem fuse libsoup-2.4
 DEPENDS_append = "${@bb.utils.contains('DISTRO_FEATURES', 'systemd', ' systemd', '', d)}"
 DEPENDS_remove_class-native = "systemd-native"
 
-RDEPENDS_${PN} = "python util-linux-libuuid util-linux-libblkid util-linux-libmount libcap xz bash"
+RDEPENDS_${PN} = "python util-linux-libuuid util-linux-libblkid util-linux-libmount libcap xz bash openssl"
 RDEPENDS_${PN}_remove_class-native = "python-native"
 
 RDEPENDS_${PN}_append_class-target = " pv"
