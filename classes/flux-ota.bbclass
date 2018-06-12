@@ -1,4 +1,4 @@
-IMAGE_INSTALL_append = " ostree os-release flux-filesystem-expand wic"
+IMAGE_INSTALL_append = " ostree os-release wic"
 IMAGE_CLASSES += "image_types_ostree image_types_ota"
 IMAGE_FSTYPES += "ostreepush otaimg wic"
 
