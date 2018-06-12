@@ -1,0 +1,50 @@
+diff --git a/configure.ac b/configure.ac
+--- a/configure.ac
++++ b/configure.ac
+@@ -203,6 +203,7 @@ dnl arbitrary path - we don't actually install there.
+      -DSHARE_INSTALL_PREFIX:PATH=/usr/libexec/rpm-ostree/share \
+      -DBUILD_SHARED_LIBS:BOOL=ON \
+      -DWITH_SWDB:BOOL=0 \
++-DPYTHON_INSTALL_DIR=/usr/lib64/python3.5/site-packages -DWITH_MAN=OFF -DPYTHON_DESIRED=3 \
+      ${cmake_args} ../libdnf) || exit 1
+ 
+ AC_CONFIG_FILES([
+diff --git a/libdnf/CMakeLists.txt b/libdnf/CMakeLists.txt
+--- a/libdnf/CMakeLists.txt
++++ b/libdnf/CMakeLists.txt
+@@ -35,8 +35,9 @@ OPTION (WITH_SWDB "Support for unified software database" ON)
+ find_package (PkgConfig REQUIRED)
+ SET (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
+ PKG_CHECK_MODULES(GLIB gio-unix-2.0>=2.46.0 REQUIRED)
+-FIND_LIBRARY (RPMDB_LIBRARY NAMES rpmdb)
+-find_package (LibSolv 0.6.21 REQUIRED COMPONENTS ext)
++set(RPMDB_LIBRARY rpm)
++PKG_CHECK_MODULES (LIBSOLV REQUIRED libsolv libsolvext)
++set(LIBSOLV_LIBRARY ${LIBSOLV_LIBRARIES})
+ if (ENABLE_RHSM_SUPPORT)
+     pkg_check_modules (RHSM REQUIRED librhsm)
+     include_directories (${RHSM_INCLUDE_DIRS})
+diff --git a/libdnf/libdnf/CMakeLists.txt b/libdnf/libdnf/CMakeLists.txt
+--- a/libdnf/libdnf/CMakeLists.txt
++++ b/libdnf/libdnf/CMakeLists.txt
+@@ -133,7 +133,7 @@ if (GOBJECT_INTROSPECTION_FOUND)
+         set(GIR_TYPELIB "${GIR_PREFIX}.typelib")
+ 
+         add_custom_command(OUTPUT ${GIR_XML}
+-            COMMAND env CFLAGS=${CMAKE_C_FLAGS} ${GOBJECT_INTROSPECTION_1.0_G_IR_SCANNER}
++            COMMAND env CFLAGS=${CMAKE_C_FLAGS} $ENV{PKG_CONFIG_SYSROOT_DIR}${GOBJECT_INTROSPECTION_1.0_G_IR_SCANNER}
+                     --namespace=Dnf
+                     --nsversion=${DNF_SO_VERSION}.0
+                     --library-path=${CMAKE_CURRENT_BINARY_DIR}
+@@ -153,7 +153,7 @@ if (GOBJECT_INTROSPECTION_FOUND)
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+ 
+         add_custom_command(OUTPUT ${GIR_TYPELIB}
+-            COMMAND ${GOBJECT_INTROSPECTION_1.0_G_IR_COMPILER}
++            COMMAND $ENV{PKG_CONFIG_SYSROOT_DIR}${GOBJECT_INTROSPECTION_1.0_G_IR_COMPILER}
+                     -o ${GIR_TYPELIB}
+                     ${GIR_XML}
+             DEPENDS ${GIR_XML}
+-- 
+2.11.0
+

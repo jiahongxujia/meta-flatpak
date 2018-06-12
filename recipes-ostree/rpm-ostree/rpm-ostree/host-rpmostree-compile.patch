@@ -1,0 +1,195 @@
+---
+ configure.ac                    |    2 -
+ src/daemon/rpmostreed-os.c      |    4 +++
+ src/daemon/rpmostreed-sysroot.c |    4 +++
+ src/lib/polkit/polkit.h         |   12 +++++++++
+ src/lib/systemd/sd-daemon.h     |   21 +++++++++++++++
+ src/lib/systemd/sd-journal.h    |   53 ++++++++++++++++++++++++++++++++++++++++
+ src/lib/systemd/sd-login.h      |   14 ++++++++++
+ 7 files changed, 108 insertions(+), 2 deletions(-)
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -95,8 +95,6 @@ LIBS="$save_LIBS"
+ PKG_CHECK_MODULES(PKGDEP_GIO_UNIX, [gio-unix-2.0])
+ PKG_CHECK_MODULES(PKGDEP_RPMOSTREE, [gio-unix-2.0 >= 2.50.0 json-glib-1.0
+ 				     ostree-1 >= 2018.2
+-				     libsystemd
+-				     polkit-gobject-1
+ 				     rpm librepo libsolv
+ 				     libarchive])
+ dnl bundled libdnf
+--- a/src/daemon/rpmostreed-os.c
++++ b/src/daemon/rpmostreed-os.c
+@@ -92,7 +92,9 @@ os_authorize_method (GDBusInterfaceSkele
+                      GDBusMethodInvocation  *invocation)
+ {
+   RpmostreedSysroot *sysroot = rpmostreed_sysroot_get ();
++#ifdef USE_POLKIT
+   PolkitAuthority *authority = rpmostreed_sysroot_get_polkit_authority (sysroot);
++#endif
+   const gchar *method_name = g_dbus_method_invocation_get_method_name (invocation);
+   const gchar *sender = g_dbus_method_invocation_get_sender (invocation);
+   GVariant *parameters = g_dbus_method_invocation_get_parameters (invocation);
+@@ -211,6 +213,7 @@ os_authorize_method (GDBusInterfaceSkele
+       authorized = FALSE;
+     }
+ 
++#ifdef USE_POLKIT
+   for (guint i = 0; i < actions->len; i++)
+     {
+       const gchar *action = g_ptr_array_index (actions, i);
+@@ -233,6 +236,7 @@ os_authorize_method (GDBusInterfaceSkele
+       if (!authorized)
+         break;
+     }
++#endif
+ 
+   if (!authorized)
+     {
+--- a/src/daemon/rpmostreed-sysroot.c
++++ b/src/daemon/rpmostreed-sysroot.c
+@@ -534,6 +534,7 @@ rpmostreed_sysroot_init (RpmostreedSysro
+   if (g_getenv ("RPMOSTREE_USE_SESSION_BUS") != NULL)
+     self->on_session_bus = TRUE;
+ 
++#ifdef USE_POLKIT
+   /* Only use polkit when running as root on system bus; self-tests don't need it */
+   if (!self->on_session_bus)
+     {
+@@ -544,6 +545,7 @@ rpmostreed_sysroot_init (RpmostreedSysro
+           errx (EXIT_FAILURE, "Can't get polkit authority: %s", local_error->message);
+         }
+     }
++#endif
+ 
+   rpmostree_output_set_callback (sysroot_output_cb, self);
+ }
+@@ -631,6 +633,7 @@ sysroot_authorize_method (GDBusInterface
+         }
+     }
+ 
++#ifdef USE_POLKIT
+   /* only ask polkit if we didn't already authorize it */
+   if (!authorized && action != NULL)
+     {
+@@ -653,6 +656,7 @@ sysroot_authorize_method (GDBusInterface
+ 
+       authorized = polkit_authorization_result_get_is_authorized (result);
+     }
++#endif
+ 
+   if (!authorized)
+     {
+--- /dev/null
++++ b/src/lib/polkit/polkit.h
+@@ -0,0 +1,12 @@
++#ifndef POLKIT_H
++#define POLKIT_H 1
++#include <stdio.h>
++#include <stdarg.h>
++#include <unistd.h>
++#include <inttypes.h>
++#include <string.h>
++
++struct _PolkitAuthority;
++typedef struct _PolkitAuthority PolkitAuthority;
++
++#endif
+--- /dev/null
++++ b/src/lib/systemd/sd-daemon.h
+@@ -0,0 +1,21 @@
++#ifndef SD_DAEMON_H
++#define SD_DAEMON_H 1
++#include <stdio.h>
++#include <stdarg.h>
++#include <unistd.h>
++#include <inttypes.h>
++#include <string.h>
++
++static inline void sd_notifyf(int val, const char *fmt, ...)
++{
++        va_list args;
++        va_start(args, fmt);
++	vprintf(fmt, args);
++}
++static inline void sd_notify(int val, const char *fmt, ...)
++{
++        va_list args;
++        va_start(args, fmt);
++	vprintf(fmt, args);
++}
++#endif
+--- /dev/null
++++ b/src/lib/systemd/sd-journal.h
+@@ -0,0 +1,53 @@
++#ifndef SD_JOURNAL_H
++#define SD_JOURNAL_H 1
++
++#ifndef LOG_INFO
++#define LOG_INFO 1
++#endif
++#ifndef LOG_WARNING
++#define LOG_WARNING 2
++#endif
++#ifndef LOG_ERR
++#define LOG_ERR 3
++#endif
++
++#include <stdio.h>
++#include <stdarg.h>
++#include <unistd.h>
++#include <inttypes.h>
++#include <string.h>
++
++typedef union sd_id128 sd_id128_t;
++
++union sd_id128 {
++        uint8_t bytes[16];
++        uint64_t qwords[2];
++};
++
++#define SD_ID128_STRING_MAX 33
++#define SD_ID128_MAKE(v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15) \
++  ((const sd_id128_t) { .bytes = { 0x##v0, 0x##v1, 0x##v2, 0x##v3, 0x##v4, 0x##v5, 0x##v6, 0x##v7, \
++                                   0x##v8, 0x##v9, 0x##v10, 0x##v11, 0x##v12, 0x##v13, 0x##v14, 0x##v15 }})
++
++
++
++#define SD_ID128_FORMAT_STR "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
++#define SD_ID128_FORMAT_VAL(x) (x).bytes[0], (x).bytes[1], (x).bytes[2], (x).bytes[3], (x).bytes[4], (x).bytes[5], (x).bytes[6], (x).bytes[7], (x).bytes[8], (x).bytes[9], (x).bytes[10], (x).bytes[11], (x).bytes[12], (x).bytes[13], (x).bytes[14], (x).bytes[15]
++
++
++static inline void sd_journal_print(int x, const char *fmt, ...)
++{
++        va_list args;
++        va_start(args, fmt);
++        vprintf(fmt, args);
++}
++
++static inline int sd_journal_stream_fd(const char *id, int error_level, int junk) {
++        return dup(fileno(stdout));
++}
++
++static inline void sd_journal_send(const char *id, ...) {
++        va_list args;
++        va_start(args, id);
++}
++#endif
+--- /dev/null
++++ b/src/lib/systemd/sd-login.h
+@@ -0,0 +1,14 @@
++#ifndef SD_LOGIN_H
++#define SD_LOGIN_H 1
++#include <stdio.h>
++#include <stdarg.h>
++#include <unistd.h>
++#include <inttypes.h>
++#include <string.h>
++
++static inline int sd_uid_get_state(int uid, void *val)
++{
++        return 1;
++}
++
++#endif

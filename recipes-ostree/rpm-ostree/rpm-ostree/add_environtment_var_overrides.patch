@@ -1,0 +1,51 @@
+---
+ libdnf/libdnf/dnf-context.cpp |    8 ++++++++
+ libdnf/libdnf/dnf-keyring.cpp |    4 +++-
+ libdnf/libdnf/hy-util.cpp     |    6 ++++++
+ 3 files changed, 17 insertions(+), 1 deletion(-)
+
+--- a/libdnf/libdnf/dnf-context.cpp
++++ b/libdnf/libdnf/dnf-context.cpp
+@@ -300,6 +300,14 @@ dnf_context_get_base_arch(DnfContext *co
+     /* get info from RPM */
+     rpmGetOsInfo(&value, NULL);
+     priv->os_info = g_strdup(value);
++
++    char *env_try = getenv("BASEARCH");
++    if (env_try) {
++        priv->base_arch = g_strdup(env_try);
++        priv->arch_info = g_strdup(env_try);
++        return priv->base_arch;
++    }
++
+     rpmGetArchInfo(&value, NULL);
+     priv->arch_info = g_strdup(value);
+ 
+--- a/libdnf/libdnf/dnf-keyring.cpp
++++ b/libdnf/libdnf/dnf-keyring.cpp
+@@ -163,7 +163,9 @@ out:
+ gboolean
+ dnf_keyring_add_public_keys(rpmKeyring keyring, GError **error)
+ {
+-    const gchar *gpg_dir = "/etc/pki/rpm-gpg";
++    const gchar *gpg_dir = getenv("RPM_GPG_DIR");
++    if (!gpg_dir)
++        gpg_dir = "/etc/pki/rpm-gpg";
+     gboolean ret = TRUE;
+     g_autoptr(GDir) dir = NULL;
+ 
+--- a/libdnf/libdnf/hy-util.cpp
++++ b/libdnf/libdnf/hy-util.cpp
+@@ -115,6 +115,12 @@ hy_detect_arch(char **arch)
+ {
+     struct utsname un;
+ 
++    /* Allow archgroup override for something like core2_64:x86_64 etc... */
++    char *archgroup_override = getenv("ARCHGROUP");
++    if (archgroup_override) {
++        *arch = g_strdup("intel_corei7_64:core2_64_intel_common:core2_64:x86_64");
++        return 0;
++    }
+     if (uname(&un) < 0)
+         return DNF_ERROR_FAILED;
+ 

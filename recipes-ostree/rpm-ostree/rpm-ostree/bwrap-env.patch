@@ -1,0 +1,49 @@
+---
+ src/libpriv/rpmostree-bwrap.c |   19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+--- a/src/libpriv/rpmostree-bwrap.c
++++ b/src/libpriv/rpmostree-bwrap.c
+@@ -219,12 +219,17 @@ rpmostree_bwrap_new (int rootfs_fd,
+    *  - We pull in the current process' LANG, since that's what people
+    *    have historically expected from RPM scripts.
+    */
+-  const char *bwrap_env[] = {"PATH=/usr/sbin:/usr/bin", lang_var, NULL};
++  const char *bwrap_env[] = {"PATH=/usr/sbin:/usr/bin:/bin:/sbin:/bin:/sbin", lang_var, NULL};
+   g_subprocess_launcher_set_environ (ret->launcher, (char**)bwrap_env);
+ 
++  char *path_bwrap = getenv("WITH_BUBBLEWRAP_PATH");
++
++  if (!path_bwrap)
++    path_bwrap = WITH_BUBBLEWRAP_PATH;
++
+   /* ⚠⚠⚠ If you change this, also update scripts/bwrap-script-shell.sh ⚠⚠⚠ */
+   rpmostree_bwrap_append_bwrap_argv (ret,
+-                                     WITH_BUBBLEWRAP_PATH,
++                                     path_bwrap,
+                                      "--dev", "/dev",
+                                      "--proc", "/proc",
+                                      "--dir", "/tmp",
+@@ -297,14 +302,20 @@ rpmostree_bwrap_new (int rootfs_fd,
+   switch (mutable)
+     {
+     case RPMOSTREE_BWRAP_IMMUTABLE:
+-      rpmostree_bwrap_append_bwrap_argv (ret, "--ro-bind", "usr", "/usr", NULL);
++      if (getenv("BWRAP_BIND_SLASH"))
++        rpmostree_bwrap_append_bwrap_argv (ret, "--ro-bind", "/", "/", NULL);
++      else
++        rpmostree_bwrap_append_bwrap_argv (ret, "--ro-bind", "usr", "/usr", NULL);
+       break;
+     case RPMOSTREE_BWRAP_MUTATE_ROFILES:
+       if (!setup_rofiles_usr (ret, error))
+         return NULL;
+       break;
+     case RPMOSTREE_BWRAP_MUTATE_FREELY:
+-      rpmostree_bwrap_append_bwrap_argv (ret, "--bind", "usr", "/usr", NULL);
++      if (getenv("BWRAP_BIND_SLASH"))
++        rpmostree_bwrap_append_bwrap_argv (ret, "--bind", "/", "/", NULL);
++      else
++        rpmostree_bwrap_append_bwrap_argv (ret, "--bind", "usr", "/usr", NULL);
+       break;
+     }
+ 

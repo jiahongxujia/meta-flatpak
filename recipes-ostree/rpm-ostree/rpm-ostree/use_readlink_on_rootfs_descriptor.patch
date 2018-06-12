@@ -1,0 +1,45 @@
+---
+ libdnf/libdnf/dnf-transaction.cpp |   18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+--- a/libdnf/libdnf/dnf-transaction.cpp
++++ b/libdnf/libdnf/dnf-transaction.cpp
+@@ -1468,6 +1468,8 @@ dnf_transaction_commit(DnfTransaction *t
+     rpmprobFilterFlags problems_filter = 0;
+     rpmtransFlags rpmts_flags = RPMTRANS_FLAG_NONE;
+     DnfTransactionPrivate *priv = GET_PRIVATE(transaction);
++    char *real_dir;
++    char *try_dir;
+ 
+     /* take lock */
+     ret = dnf_state_take_lock(state,
+@@ -1518,7 +1520,19 @@ dnf_transaction_commit(DnfTransaction *t
+ 
+     /* setup the transaction */
+     tmp = dnf_context_get_install_root(priv->context);
+-    rc = rpmtsSetRootDir(priv->ts, tmp);
++    try_dir = g_strdup(tmp);
++    rc = strlen(try_dir);
++    if (rc > 3 && try_dir[rc - 1] == '.' && try_dir[rc - 2] == '/')
++        try_dir[rc - 2] = '\0';
++    real_dir = (char *)g_malloc(1024);
++    rc = readlink(try_dir, real_dir, 1022);
++    if (rc > 0)
++        real_dir[rc] = '\0';
++    rc = rpmtsSetRootDir(priv->ts, real_dir);
++    if (!g_setenv("D", real_dir, TRUE))
++        perror("g_setenv");
++    g_free(real_dir);
++    g_free(try_dir);
+     if (rc < 0) {
+         ret = FALSE;
+         g_set_error_literal(error,
+@@ -1682,6 +1696,8 @@ dnf_transaction_commit(DnfTransaction *t
+         problems_filter |= RPMPROB_FILTER_REPLACEPKG;
+     if (priv->flags & DNF_TRANSACTION_FLAG_ALLOW_DOWNGRADE)
+         problems_filter |= RPMPROB_FILTER_OLDPACKAGE;
++    /* Ignore arch */
++    problems_filter |= RPMPROB_FILTER_IGNOREARCH;
+ 
+     if (priv->flags & DNF_TRANSACTION_FLAG_NODOCS)
+         rpmts_flags |= RPMTRANS_FLAG_NODOCS;
