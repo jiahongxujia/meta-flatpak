@@ -131,9 +131,10 @@ IMAGE_CMD_otaimg () {
 		rm -rf ${DEPLOY_DIR_IMAGE}/${IMAGE_NAME}_efi.otaimg
 		rm -rf ${DEPLOY_DIR_IMAGE}/${IMAGE_NAME}_var.otaimg
 		sync
-                #create an image with the free space equal the rootfs size
 
-                cat<<EOF>>${PHYS_SYSROOT}/ostree/deploy/${OSTREE_OSNAME}/var/wic.wks.sample
+                #create an image with the free space equal the rootfs size
+                wic_wks_path=$(find ${PHYS_SYSROOT}/ostree/deploy/${OSTREE_OSNAME}/deploy/ -maxdepth 2 -name "var")
+                cat<<EOF>>${wic_wks_path}/wic.wks.sample
 part /boot/efi --source  rootfs --rootfs-dir=/boot/efi  --ondisk sda --fstype=vfat --label otaefi --active --align 4
 part /boot --source  rootfs --rootfs-dir=/boot  --ondisk sda --fstype=ext4 --label otaboot --size 200M --active --align 4
 part / --source rootfs --rootfs-dir=/sysroot --ondisk sda --fstype=ext4 --label ${ROOT_LABEL} --size 3G --align 4
