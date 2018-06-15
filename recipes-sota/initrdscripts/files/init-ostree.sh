@@ -31,6 +31,7 @@ UMOUNT="/bin/umount"
 ROOT_DELAY="0"
 OSTREE_SYSROOT=""
 #OSTREE_LABEL_BOOT="otaboot"
+OSTREE_BOOT_DEVICE="LABEL=otaboot"
 OSTREE_LABEL_FLUXDATA="fluxdata"
 # The timeout (tenth of a second) for rootfs on low speed device
 MAX_TIMEOUT_FOR_WAITING_LOWSPEED_DEVICE=60
@@ -91,6 +92,8 @@ read_args() {
 		ROOT_FLAGS=$optarg ;;
             init=*)
                 INIT=$optarg ;;
+            ostree_boot=*)
+		OSTREE_BOOT_DEVICE=$optarg ;;
         esac
     done
 }
@@ -176,7 +179,7 @@ done
 
 echo "Waiting for boot device to be ready..."
 while [ 1 ] ; do
-    mount "LABEL=otaboot" "${ROOT_MOUNT}/boot" && break
+    mount "${OSTREE_BOOT_DEVICE}" "${ROOT_MOUNT}/boot" && break
     sleep 0.1
 done
 
