@@ -10,6 +10,7 @@ SRC_URI = " \
     file://bwrap-env.patch \
     file://add_environtment_var_overrides.patch \
     file://use_readlink_on_rootfs_descriptor.patch \
+    file://finalize-script.patch \
 "
 
 SRC_URI_append_class-native = " file://host-rpmostree-compile.patch \

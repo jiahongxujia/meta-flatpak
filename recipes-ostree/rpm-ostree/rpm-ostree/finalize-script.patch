@@ -1,0 +1,34 @@
+diff --git a/src/libpriv/rpmostree-postprocess.c b/src/libpriv/rpmostree-postprocess.c
+index 446a1e23..a5d41f1d 100644
+--- a/src/libpriv/rpmostree-postprocess.c
++++ b/src/libpriv/rpmostree-postprocess.c
+@@ -1648,6 +1648,29 @@ rpmostree_treefile_postprocessing (int            rootfs_fd,
+   if (!copy_additional_files (rootfs_fd, context_directory, treefile, cancellable, error))
+     return FALSE;
+ 
++  const char *finalize_script = NULL;
++  _rpmostree_jsonutil_object_get_optional_string_member (treefile, "finalize-script",
++                                                         &finalize_script, error);
++  if (finalize_script)
++    {
++      const char *bn = glnx_basename (finalize_script);
++      g_autofree char *src = NULL;
++      g_autofree char *binpath = NULL;
++
++      if (g_path_is_absolute (finalize_script))
++        src = g_strdup (finalize_script);
++      else
++        src = g_build_filename (gs_file_get_path_cached (context_directory), finalize_script, NULL);
++      g_print ("Executing finalize script '%s'\n", src);
++      if (system(src) != 0)
++        {
++          g_print ("Bad exit for (%s)\n", src);
++          return FALSE;
++        }
++      g_print ("Finished finalize script '%s'\n", src);
++    }
++
++
+   const char *postprocess_script = NULL;
+   if (!_rpmostree_jsonutil_object_get_optional_string_member (treefile, "postprocess-script",
+                                                               &postprocess_script, error))

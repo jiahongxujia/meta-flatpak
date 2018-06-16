@@ -1,6 +1,6 @@
 ---
- libdnf/libdnf/dnf-transaction.cpp |   18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ libdnf/libdnf/dnf-transaction.cpp |   22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
 --- a/libdnf/libdnf/dnf-transaction.cpp
 +++ b/libdnf/libdnf/dnf-transaction.cpp
@@ -13,7 +13,7 @@
  
      /* take lock */
      ret = dnf_state_take_lock(state,
-@@ -1518,7 +1520,19 @@ dnf_transaction_commit(DnfTransaction *t
+@@ -1518,7 +1520,23 @@ dnf_transaction_commit(DnfTransaction *t
  
      /* setup the transaction */
      tmp = dnf_context_get_install_root(priv->context);
@@ -27,14 +27,18 @@
 +    if (rc > 0)
 +        real_dir[rc] = '\0';
 +    rc = rpmtsSetRootDir(priv->ts, real_dir);
-+    if (!g_setenv("D", real_dir, TRUE))
-+        perror("g_setenv");
++    if (getenv("USE_ALT_ROOT")){
++        if (!g_setenv("D", real_dir, TRUE))
++            perror("g_setenv");
++        if (!g_setenv("OPKG_OFFLINE_ROOT", real_dir, TRUE))
++            perror("g_setenv");
++    }
 +    g_free(real_dir);
 +    g_free(try_dir);
      if (rc < 0) {
          ret = FALSE;
          g_set_error_literal(error,
-@@ -1682,6 +1696,8 @@ dnf_transaction_commit(DnfTransaction *t
+@@ -1682,6 +1700,8 @@ dnf_transaction_commit(DnfTransaction *t
          problems_filter |= RPMPROB_FILTER_REPLACEPKG;
      if (priv->flags & DNF_TRANSACTION_FLAG_ALLOW_DOWNGRADE)
          problems_filter |= RPMPROB_FILTER_OLDPACKAGE;
