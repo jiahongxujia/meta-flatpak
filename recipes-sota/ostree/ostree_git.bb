@@ -22,6 +22,7 @@ SRC_URI = "gitsm://github.com/ostreedev/ostree.git;branch=master \
 	   file://0001-retrieve-correct-boot-prefix-at-runtime.patch \
 	   file://0001-encrypt-decrypt-password-of-remote-repository-uri.patch \
 	   file://0001-tweak-regex-of-ostree-system-generator-for-pulsar.patch \
+	   file://0001-lib-repo-pull-Fix-free-function-for-hash-table.patch \
 	"
 
 

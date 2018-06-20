@@ -1,0 +1,40 @@
+From 350c1b14045d7eee6472c9ac0179bed22ef728c5 Mon Sep 17 00:00:00 2001
+From: Matthew Leeds <matthew.leeds@endlessm.com>
+Date: Wed, 28 Feb 2018 16:06:31 -0800
+Subject: [PATCH] lib/repo-pull: Fix free function for hash table
+
+The "ref_original_commits" hash table uses string values, not variants,
+so fix the free function passed to g_hash_table_new_full (). Since
+g_variant_unref isn't NULL safe, this prevents an assertion failure when
+a NULL value is inserted.
+
+Dan Nicholson suggested this patch; I'm just submitting it because he's
+busy.
+
+Fixes https://github.com/ostreedev/ostree/issues/1433
+
+Closes: #1474
+Approved by: cgwalters
+
+Upstream-Status: Backport
+Signed-off-by: Hongxu Jia <hongxu.jia@windriver.com>
+---
+ src/libostree/ostree-repo-pull.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libostree/ostree-repo-pull.c b/src/libostree/ostree-repo-pull.c
+index da2abe1..93d68ce 100644
+--- a/src/libostree/ostree-repo-pull.c
++++ b/src/libostree/ostree-repo-pull.c
+@@ -3401,7 +3401,7 @@ ostree_repo_pull_with_options (OstreeRepo             *self,
+                                                                (GDestroyNotify)g_free);
+   pull_data->ref_original_commits = g_hash_table_new_full (ostree_collection_ref_hash, ostree_collection_ref_equal,
+                                                            (GDestroyNotify)NULL,
+-                                                           (GDestroyNotify)g_variant_unref);
++                                                           (GDestroyNotify)g_free);
+   pull_data->gpg_verified_commits = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                                            (GDestroyNotify)g_free, NULL);
+   pull_data->scanned_metadata = g_hash_table_new_full (ostree_hash_object_name, g_variant_equal,
+-- 
+2.7.4
+
