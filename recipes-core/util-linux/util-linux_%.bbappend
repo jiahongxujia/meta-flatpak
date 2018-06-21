@@ -16,4 +16,4 @@ do_install_append () {
     fi
 }
 
-
+ALTERNATIVE_${PN}_remove = "nologin"
